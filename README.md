@@ -1,4 +1,4 @@
-# 🦺 Protego - I Protect. The Shield for Workers.
+# ![Protego Logo](assets/logo.gif) Protego - I Protect. The Shield for Workers.
 
 A real-time Personal Protective Equipment (PPE) detection system using YOLOv8 and computer vision. This application helps monitor workplace safety by detecting safety equipment like helmets, vests, gloves, and other protective gear through webcam or video streams.
 
