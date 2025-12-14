@@ -1,9 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi==0.124.4
 uvicorn==0.38.0
 numpy<2.3
 opencv-python-headless==4.12.0.88
 
-# CPU-only Torch (VERY IMPORTANT)
 torch==2.2.2+cpu
 torchvision==0.17.2+cpu
 
