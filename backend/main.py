@@ -1,11 +1,24 @@
 from fastapi import FastAPI, WebSocket
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import cv2
 import base64
 import numpy as np
 from ultralytics import YOLO
 import time
+import os
 
 app = FastAPI()
+
+# -----------------------------
+# Serve Frontend
+# -----------------------------
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def serve_ui():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 # -----------------------------
 # Load PPE Model
@@ -39,24 +52,21 @@ async def safety_socket(websocket: WebSocket):
 
     try:
         while True:
-            # ---------------------------------
-            # Receive frame
-            # ---------------------------------
             data = await websocket.receive_text()
             _, encoded = data.split(",", 1)
 
             img_bytes = base64.b64decode(encoded)
-            img_array = np.frombuffer(img_bytes, np.uint8)
-            frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            frame = cv2.imdecode(
+                np.frombuffer(img_bytes, np.uint8),
+                cv2.IMREAD_COLOR
+            )
 
             if frame is None:
                 continue
 
             now = time.time()
 
-            # ---------------------------------
-            # Detection throttling + persistence
-            # ---------------------------------
+            # Throttled detection
             if now - last_detect_time >= DETECT_INTERVAL:
                 last_detect_time = now
                 last_results = model(frame, verbose=False)[0]
@@ -71,9 +81,9 @@ async def safety_socket(websocket: WebSocket):
             annotated = frame.copy()
             violations = []
 
-            # ---------------------------------
-            # PPE Detection ONLY
-            # ---------------------------------
+            # -----------------------------
+            # PPE ONLY
+            # -----------------------------
             if results:
                 for box in results.boxes:
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -102,18 +112,11 @@ async def safety_socket(websocket: WebSocket):
                             "confidence": round(conf, 2)
                         })
 
-                # Draw YOLO annotations
                 annotated = results.plot()
 
-            # ---------------------------------
-            # Trim logs
-            # ---------------------------------
             if len(SAFETY_LOG) > MAX_LOGS:
                 SAFETY_LOG[:] = SAFETY_LOG[-MAX_LOGS:]
 
-            # ---------------------------------
-            # Encode & send
-            # ---------------------------------
             _, jpeg = cv2.imencode(
                 ".jpg",
                 annotated,

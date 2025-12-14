@@ -8,14 +8,12 @@
     body {
       margin: 0;
       background: #0b0b0b;
-      color: #ffffff;
+      color: #fff;
       font-family: Arial, sans-serif;
       text-align: center;
     }
 
-    h2 {
-      margin: 12px;
-    }
+    h2 { margin: 12px; }
 
     video, canvas {
       width: 640px;
@@ -24,22 +22,22 @@
     }
 
     #status {
-      margin-top: 8px;
+      margin-top: 6px;
       font-size: 14px;
       color: #00ff6a;
     }
 
     #log-panel {
+      width: 640px;
+      height: 180px;
       margin: 12px auto;
       padding: 10px;
       border: 1px solid #444;
-      width: 640px;
-      height: 180px;
+      background: #111;
       overflow-y: auto;
       font-family: monospace;
       color: #ff4c4c;
       text-align: left;
-      background: #111;
     }
 
     button {
@@ -51,9 +49,7 @@
       cursor: pointer;
     }
 
-    button:hover {
-      background: #333;
-    }
+    button:hover { background: #333; }
   </style>
 </head>
 
@@ -62,7 +58,7 @@
 <h2>🦺 Construction PPE Safety – Live Monitor</h2>
 
 <video id="video" autoplay playsinline></video>
-<canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+<canvas id="canvas" width="640" height="480" hidden></canvas>
 <canvas id="output" width="640" height="480"></canvas>
 
 <div id="status">Initializing…</div>
@@ -71,69 +67,61 @@
 <button onclick="toggleAudio()">🔊 Toggle Audio</button>
 
 <script>
-/* ======================================================
-   AUDIO ENGINE (QUEUE-BASED, NO OVERLAP)
-====================================================== */
+/* ================= AUDIO ENGINE ================= */
 let audioEnabled = true;
-let isSpeaking = false;
-const alertQueue = [];
+let speaking = false;
+const queue = [];
 const lastSpoken = {};
-const SAME_ALERT_COOLDOWN = 5000;
+const COOLDOWN = 5000;
 let voices = [];
 
 speechSynthesis.onvoiceschanged = () => {
   voices = speechSynthesis.getVoices();
 };
 
-function enqueueAlert(type, message) {
+function enqueue(type, msg) {
   if (!audioEnabled) return;
 
   const now = Date.now();
-  if (lastSpoken[type] && now - lastSpoken[type] < SAME_ALERT_COOLDOWN) {
-    return;
-  }
+  if (lastSpoken[type] && now - lastSpoken[type] < COOLDOWN) return;
 
   lastSpoken[type] = now;
-  alertQueue.push(message);
-  processQueue();
+  queue.push(msg);
+  playNext();
 }
 
-function processQueue() {
-  if (isSpeaking || alertQueue.length === 0) return;
+function playNext() {
+  if (speaking || queue.length === 0) return;
 
-  isSpeaking = true;
-  const msg = alertQueue.shift();
+  speaking = true;
+  const text = queue.shift();
+  const u = new SpeechSynthesisUtterance(text);
 
-  const utterance = new SpeechSynthesisUtterance(msg);
-  utterance.rate = 1.05;
-  utterance.volume = 1.0;
+  const en = voices.find(v => v.lang.startsWith("en"));
+  if (en) u.voice = en;
 
-  const enVoice = voices.find(v => v.lang.startsWith("en"));
-  if (enVoice) utterance.voice = enVoice;
-
-  utterance.onend = () => {
-    isSpeaking = false;
-    processQueue();
+  u.rate = 1.05;
+  u.onend = () => {
+    speaking = false;
+    playNext();
   };
 
-  speechSynthesis.speak(utterance);
+  speechSynthesis.speak(u);
 }
 
 function toggleAudio() {
   audioEnabled = !audioEnabled;
   speechSynthesis.cancel();
-  alertQueue.length = 0;
-  isSpeaking = false;
+  queue.length = 0;
+  speaking = false;
 }
 
-/* ======================================================
-   VIDEO + WEBSOCKET
-====================================================== */
+/* ================= VIDEO + WS ================= */
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const output = document.getElementById("output");
 const ctx = canvas.getContext("2d");
-const outCtx = output.getContext("2d");
+const out = output.getContext("2d");
 const status = document.getElementById("status");
 const logPanel = document.getElementById("log-panel");
 
@@ -143,47 +131,31 @@ const ws = new WebSocket(
   "/ws/safety"
 );
 
-
-ws.onopen = () => status.textContent = "✅ WebSocket connected";
+ws.onopen = () => status.textContent = "✅ Connected";
 ws.onerror = () => status.textContent = "❌ WebSocket error";
 
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
+ws.onmessage = e => {
+  const d = JSON.parse(e.data);
 
-  // Logs
   logPanel.innerHTML = "";
-  if (data.logs) {
-    data.logs.slice().reverse().forEach(l => {
-      logPanel.innerHTML += `[${l.time}] ${l.type}<br>`;
-    });
-  }
+  d.logs?.slice().reverse().forEach(l => {
+    logPanel.innerHTML += `[${l.time}] ${l.type}<br>`;
+  });
 
-  // PPE Audio Alerts
-  if (data.violations) {
-    data.violations.forEach(v => {
-      if (v.type === "NO_HARDHAT") {
-        enqueueAlert(v.type, "Warning. Hard hat missing.");
-      }
-      if (v.type === "NO_MASK") {
-        enqueueAlert(v.type, "Warning. Safety mask missing.");
-      }
-      if (v.type === "NO_SAFETY_VEST") {
-        enqueueAlert(v.type, "Warning. Safety vest missing.");
-      }
-    });
-  }
+  d.violations?.forEach(v => {
+    if (v.type === "NO_HARDHAT") enqueue(v.type, "Warning. Hard hat missing.");
+    if (v.type === "NO_MASK") enqueue(v.type, "Warning. Safety mask missing.");
+    if (v.type === "NO_SAFETY_VEST") enqueue(v.type, "Warning. Safety vest missing.");
+  });
 
-  // Render frame
-  if (data.frame) {
+  if (d.frame) {
     const img = new Image();
-    img.onload = () => outCtx.drawImage(img, 0, 0, 640, 480);
-    img.src = "data:image/jpeg;base64," + data.frame;
+    img.onload = () => out.drawImage(img, 0, 0, 640, 480);
+    img.src = "data:image/jpeg;base64," + d.frame;
   }
 };
 
-/* ======================================================
-   CAMERA STREAM
-====================================================== */
+/* ================= CAMERA ================= */
 navigator.mediaDevices.getUserMedia({ video: true })
   .then(stream => {
     video.srcObject = stream;
@@ -192,12 +164,9 @@ navigator.mediaDevices.getUserMedia({ video: true })
     setInterval(() => {
       ctx.drawImage(video, 0, 0, 640, 480);
       ws.send(canvas.toDataURL("image/jpeg", 0.7));
-    }, 200); // ~5 FPS
+    }, 200);
   })
-  .catch(err => {
-    status.textContent = "❌ Camera access denied";
-    console.error(err);
-  });
+  .catch(() => status.textContent = "❌ Camera access denied");
 </script>
 
 </body>
