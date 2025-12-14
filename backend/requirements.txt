@@ -1,5 +1,7 @@
-fastapi
-uvicorn
-numpy
-opencv-python-headless
-ultralytics
+fastapi==0.124.4
+uvicorn==0.38.0
+numpy<2.3
+opencv-python-headless==4.12.0.88
+torch==2.2.2
+torchvision==0.17.2
+ultralytics==8.3.237
