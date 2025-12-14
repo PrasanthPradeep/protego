@@ -47,8 +47,8 @@ Before you begin, ensure you have the following installed on your system:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/assistive_vision.git
-cd assistive_vision
+git clone https://github.com/yourusername/protego.git
+cd protego
 ```
 
 ### 2. Set Up Python Environment
@@ -129,7 +129,7 @@ uvicorn main:app --host 127.0.0.1 --port 8080
 You should see output similar to:
 ```
 📦 Loaded PPE classes: {0: 'Hardhat', 1: 'Mask', 2: 'NO-Hardhat', 3: 'NO-Mask', 4: 'NO-Safety Vest', 5: 'Person', 6: 'Safety Cone', 7: 'Safety Vest', 8: 'machinery', 9: 'vehicle'}
-INFO:     Started server process [236606]
+INFO:     Started server process [ ]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
@@ -138,7 +138,7 @@ INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
 ### Accessing the Application
 
 1. Open your web browser
-2. Navigate to: `http://localhost:8000`
+2. Navigate to: `http://127.0.0.1:8080`
 3. Allow camera access when prompted
 4. The live detection feed will start automatically
 
@@ -169,15 +169,15 @@ assistive_vision/
 │   ├── main.py              # FastAPI application & WebSocket server
 │   ├── detector.py          # Detection logic (legacy/unused)
 │   ├── requirements.txt     # Python dependencies
-│   ├── Procfile            # Deployment configuration
+│   ├── Procfile             # Deployment configuration
 │   ├── models/
-│   │   └── ppe_yolo.pt     # YOLOv8 PPE detection model
+│   │   └── ppe_yolo.pt      # YOLOv8 PPE detection model
 │   └── static/
-│       └── index.html      # Web interface
+│       └── index.html       # Web interface
 ├── myenv/                   # Virtual environment (not in git)
-├── runtime.txt             # Python version specification
-├── LICENSE                 # Project license
-└── README.md               # This file
+├── runtime.txt              # Python version specification
+├── LICENSE                  # Project license
+└── README.md                # Docs
 ```
 
 ## 🐛 Troubleshooting
@@ -215,7 +215,7 @@ uvicorn main:app --reload --port 8081
 ### Deploy Locally with Production Settings
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
 ```
 
 ## 🤝 Contributing
@@ -234,7 +234,7 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 
 ## 👨‍💻 Author
 
-**PrasanthPradeep**
+**PrasanthPradeep**(https://github.com/PrasanthPradeep/)
 
 ## 🙏 Acknowledgments
 
