@@ -1,0 +1,15 @@
+# Ignore Virtual Environment
+myenv/
+venv/
+env/
+
+# Ignore Environment Variables (Secrets)
+.env
+
+# Ignore Compiled Python files
+__pycache__/
+*.pyc
+
+# Ignore YOLO training runs (too big)
+runs/
+ppe_data/

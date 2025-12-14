@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🦺 Construction PPE Safety – Live Monitor</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0b0b0b;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    h2 {
+      margin: 12px;
+    }
+
+    video, canvas {
+      width: 640px;
+      border: 2px solid #00ff6a;
+      margin-top: 10px;
+    }
+
+    #status {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #00ff6a;
+    }
+
+    #log-panel {
+      margin: 12px auto;
+      padding: 10px;
+      border: 1px solid #444;
+      width: 640px;
+      height: 180px;
+      overflow-y: auto;
+      font-family: monospace;
+      color: #ff4c4c;
+      text-align: left;
+      background: #111;
+    }
+
+    button {
+      margin: 6px;
+      padding: 6px 14px;
+      background: #222;
+      color: #fff;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #333;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>🦺 Construction PPE Safety – Live Monitor</h2>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+<canvas id="output" width="640" height="480"></canvas>
+
+<div id="status">Initializing…</div>
+<div id="log-panel"></div>
+
+<button onclick="toggleAudio()">🔊 Toggle Audio</button>
+
+<script>
+/* ======================================================
+   AUDIO ENGINE (QUEUE-BASED, NO OVERLAP)
+====================================================== */
+let audioEnabled = true;
+let isSpeaking = false;
+const alertQueue = [];
+const lastSpoken = {};
+const SAME_ALERT_COOLDOWN = 5000;
+let voices = [];
+
+speechSynthesis.onvoiceschanged = () => {
+  voices = speechSynthesis.getVoices();
+};
+
+function enqueueAlert(type, message) {
+  if (!audioEnabled) return;
+
+  const now = Date.now();
+  if (lastSpoken[type] && now - lastSpoken[type] < SAME_ALERT_COOLDOWN) {
+    return;
+  }
+
+  lastSpoken[type] = now;
+  alertQueue.push(message);
+  processQueue();
+}
+
+function processQueue() {
+  if (isSpeaking || alertQueue.length === 0) return;
+
+  isSpeaking = true;
+  const msg = alertQueue.shift();
+
+  const utterance = new SpeechSynthesisUtterance(msg);
+  utterance.rate = 1.05;
+  utterance.volume = 1.0;
+
+  const enVoice = voices.find(v => v.lang.startsWith("en"));
+  if (enVoice) utterance.voice = enVoice;
+
+  utterance.onend = () => {
+    isSpeaking = false;
+    processQueue();
+  };
+
+  speechSynthesis.speak(utterance);
+}
+
+function toggleAudio() {
+  audioEnabled = !audioEnabled;
+  speechSynthesis.cancel();
+  alertQueue.length = 0;
+  isSpeaking = false;
+}
+
+/* ======================================================
+   VIDEO + WEBSOCKET
+====================================================== */
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const output = document.getElementById("output");
+const ctx = canvas.getContext("2d");
+const outCtx = output.getContext("2d");
+const status = document.getElementById("status");
+const logPanel = document.getElementById("log-panel");
+
+const ws = new WebSocket(
+  (location.protocol === "https:" ? "wss://" : "ws://") +
+  location.host +
+  "/ws/safety"
+);
+
+
+ws.onopen = () => status.textContent = "✅ WebSocket connected";
+ws.onerror = () => status.textContent = "❌ WebSocket error";
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  // Logs
+  logPanel.innerHTML = "";
+  if (data.logs) {
+    data.logs.slice().reverse().forEach(l => {
+      logPanel.innerHTML += `[${l.time}] ${l.type}<br>`;
+    });
+  }
+
+  // PPE Audio Alerts
+  if (data.violations) {
+    data.violations.forEach(v => {
+      if (v.type === "NO_HARDHAT") {
+        enqueueAlert(v.type, "Warning. Hard hat missing.");
+      }
+      if (v.type === "NO_MASK") {
+        enqueueAlert(v.type, "Warning. Safety mask missing.");
+      }
+      if (v.type === "NO_SAFETY_VEST") {
+        enqueueAlert(v.type, "Warning. Safety vest missing.");
+      }
+    });
+  }
+
+  // Render frame
+  if (data.frame) {
+    const img = new Image();
+    img.onload = () => outCtx.drawImage(img, 0, 0, 640, 480);
+    img.src = "data:image/jpeg;base64," + data.frame;
+  }
+};
+
+/* ======================================================
+   CAMERA STREAM
+====================================================== */
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    video.srcObject = stream;
+    status.textContent = "📷 Camera started";
+
+    setInterval(() => {
+      ctx.drawImage(video, 0, 0, 640, 480);
+      ws.send(canvas.toDataURL("image/jpeg", 0.7));
+    }, 200); // ~5 FPS
+  })
+  .catch(err => {
+    status.textContent = "❌ Camera access denied";
+    console.error(err);
+  });
+</script>
+
+</body>
+</html>
