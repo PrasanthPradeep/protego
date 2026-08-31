@@ -581,10 +581,15 @@ const cardMap = {
   NO_SAFETY_VEST: { card: 'card-vest',    badge: 'badge-vest',    count: 'count-vest'    },
 };
 
-function triggerViolation(type) {
+function normalizeType(t) {
+  return (t || '').toUpperCase().replace(/[-\s]+/g, '_');
+}
+
+function triggerViolation(rawType) {
+  const type = normalizeType(rawType);
   const m = cardMap[type];
   if (!m) return;
-  violationCounts[type]++;
+  violationCounts[type] = (violationCounts[type] || 0) + 1;
   const card  = document.getElementById(m.card);
   const badge = document.getElementById(m.badge);
   const count = document.getElementById(m.count);
@@ -624,6 +629,7 @@ function renderLogs(logs) {
 
   const frag = document.createDocumentFragment();
   newItems.forEach(l => {
+    const nType = normalizeType(l.type);
     const row = document.createElement('div');
     row.className = 'log-row';
 
@@ -632,8 +638,8 @@ function renderLogs(logs) {
     time.textContent = l.time;
 
     const tag = document.createElement('span');
-    tag.className = `log-type ${l.type}`;
-    tag.textContent = LABELS[l.type] || l.type;
+    tag.className = `log-type ${nType}`;
+    tag.textContent = LABELS[nType] || l.type;
 
     const sev = document.createElement('span');
     sev.className = 'log-severity';
@@ -678,7 +684,7 @@ function connectWS() {
     const d = JSON.parse(e.data);
 
     // Violations
-    const activeTypes = new Set((d.violations || []).map(v => v.type));
+    const activeTypes = new Set((d.violations || []).map(v => normalizeType(v.type)));
     activeTypes.forEach(type => {
       triggerViolation(type);
       if (type === 'NO_HARDHAT')     enqueue(type, 'Warning. Hard hat missing.');

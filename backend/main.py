@@ -96,7 +96,7 @@ async def safety_socket(websocket: WebSocket):
                             continue
 
                         last_violation_time[label] = now
-                        vtype = label.upper().replace("-", "_")
+                        vtype = label.upper().replace("-", "_").replace(" ", "_")
 
                         violations.append({
                             "type": vtype,
