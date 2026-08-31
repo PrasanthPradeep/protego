@@ -4,12 +4,14 @@ A real-time Personal Protective Equipment (PPE) detection system using YOLOv8 an
 
 ## ✨ Features
 
-- 🎥 **Real-time Detection**: Live webcam feed with instant PPE detection
-- 🚀 **High Performance**: Optimized detection intervals for smooth performance
-- 🎯 **Accurate Recognition**: YOLOv8-based model for reliable PPE detection
-- 📊 **Safety Logging**: Track and log safety violations
-- 🌐 **Web Interface**: User-friendly browser-based interface
-- ⚡ **WebSocket Communication**: Real-time bidirectional data streaming
+- 🎥 **Real-time Detection**: Live webcam feed with instant PPE detection & bounding boxes
+- 🚀 **High Performance**: `requestAnimationFrame` frame dispatch & optimized detection intervals
+- 🎯 **Accurate Recognition**: YOLOv8-based model for reliable PPE detection (Hardhat, Mask, Safety Vest)
+- 📊 **Real-time Stat Cards**: Visual violation status badges (Safe / Violation) & category counters
+- 🔊 **Voice Audio Alerts**: Web Speech API audio warnings with cooldown controls (`M` key toggle)
+- 📜 **Live Incident Log**: Monospaced event stream with smooth fade-in animations
+- 💻 **Single-Page Desktop Dashboard**: Minimalist, dark VC startup aesthetic fitted to a single non-scrollable screen
+- ⚡ **WebSocket Communication**: Real-time bidirectional data streaming with auto-reconnect logic
 - 🔧 **Customizable**: Adjustable detection parameters and thresholds
 
 ## 🎬 Demo
@@ -31,7 +33,8 @@ A real-time Personal Protective Equipment (PPE) detection system using YOLOv8 an
 
 Before you begin, ensure you have the following installed on your system:
 
-- **Python 3.11.9** (recommended for optimal compatibility)
+- **Python 3.11.x** (recommended for optimal compatibility)
+- **Node.js & npm** (optional, for running via `npm start`)
 - **Git** (for cloning the repository)
 - **pip** (Python package installer)
 - **Webcam/Camera** (for live detection)
@@ -47,7 +50,7 @@ Before you begin, ensure you have the following installed on your system:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/protego.git
+git clone https://github.com/PrasanthPradeep/protego.git
 cd protego
 ```
 
@@ -57,19 +60,12 @@ cd protego
 
 ```bash
 # On Linux/macOS
-python3.11 -m venv myenv
-source myenv/bin/activate
+python3.11 -m venv myvenv
+source myvenv/bin/activate
 
 # On Windows
-python -m venv myenv
-myenv\Scripts\activate
-```
-
-#### Verify Python Version
-
-```bash
-python --version
-# Should output: Python 3.11.9
+python -m venv myvenv
+myvenv\Scripts\activate
 ```
 
 ### 3. Install Dependencies
@@ -80,59 +76,46 @@ Navigate to the backend directory and install required packages:
 cd backend
 pip install --upgrade pip
 pip install -r requirements.txt
+cd ..
 ```
 
-**Note**: This will install:
-- FastAPI & Uvicorn (Web framework)
-- PyTorch (CPU version for deep learning)
-- Ultralytics YOLO (Object detection)
-- OpenCV (Computer vision)
-- NumPy (Numerical computing)
-- WebSockets (Real-time communication)
+**Note**: This will install FastAPI, Uvicorn, PyTorch, Ultralytics YOLO, OpenCV, NumPy, and WebSockets.
 
 ### 4. Verify Model Files
 
 Ensure the YOLO model is present:
 
 ```bash
-ls models/ppe_yolo.pt
+ls backend/models/ppe_yolo.pt
 ```
-
-If the model file is missing, you'll need to obtain it or train your own PPE detection model.
 
 ## 🚀 Usage
 
 ### Starting the Application
 
-1. **Activate the virtual environment** (if not already activated):
+You can start the server using either **npm** or **Python**:
 
+#### Option A: Using NPM (Recommended)
 ```bash
-# On Linux/macOS
-source ../myenv/bin/activate
-
-# On Windows
-..\myenv\Scripts\activate
+npm start
+```
+Or for auto-reload during development:
+```bash
+npm run dev
 ```
 
-2. **Navigate to the backend directory**:
-
+#### Option B: Using Uvicorn directly
 ```bash
 cd backend
-```
-
-3. **Start the server**:
-
-```bash
-uvicorn main:app --host 127.0.0.1 --port 8080
+python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
 You should see output similar to:
 ```
 📦 Loaded PPE classes: {0: 'Hardhat', 1: 'Mask', 2: 'NO-Hardhat', 3: 'NO-Mask', 4: 'NO-Safety Vest', 5: 'Person', 6: 'Safety Cone', 7: 'Safety Vest', 8: 'machinery', 9: 'vehicle'}
 INFO:     Started server process [ ]
-INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
 ```
 
 ### Accessing the Application
@@ -142,12 +125,22 @@ INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
 3. Allow camera access when prompted
 4. The live detection feed will start automatically
 
+### 🌐 Accessing from Mobile or Remote Devices over Internet
+
+Browsers require **HTTPS** for camera permissions on remote devices:
+
+```bash
+# Using ngrok to generate a secure HTTPS tunnel
+npx ngrok http 8080
+```
+Open the generated `https://xxxx.ngrok-free.app` URL on any phone or remote browser.
+
 ### Using the Interface
 
-- **Start Detection**: The system automatically starts detecting PPE when you access the page
-- **View Results**: Detected objects are highlighted with bounding boxes and labels
-- **Safety Logs**: Violations and detections are logged in real-time
-- **Stop Detection**: Simply close the browser tab or stop the server (CTRL+C)
+- **Live Video Feed**: Camera stream with real-time detection boxes
+- **Stat Cards**: Real-time Safe/Violation badges for Hard Hat, Mask, and Safety Vest
+- **Incident Log**: Auto-updating list of timestamped safety violations
+- **Audio Alerts**: Voice warnings when violations occur (press **`M`** or click 🔊 to toggle)
 
 ## ⚙️ Configuration
 
@@ -164,7 +157,7 @@ VIOLATION_COOLDOWN = 2.0    # Cooldown between violation alerts (seconds)
 ## 📁 Project Structure
 
 ```
-assistive_vision/
+protego/
 ├── backend/
 │   ├── main.py              # FastAPI application & WebSocket server
 │   ├── detector.py          # Detection logic (legacy/unused)
@@ -173,11 +166,12 @@ assistive_vision/
 │   ├── models/
 │   │   └── ppe_yolo.pt      # YOLOv8 PPE detection model
 │   └── static/
-│       └── index.html       # Web interface
-├── myenv/                   # Virtual environment (not in git)
-├── runtime.txt              # Python version specification
+│       └── index.html       # Web interface (Single-page dashboard)
+├── package.json             # NPM scripts (start, dev)
+├── package-lock.json        # NPM lockfile
+├── myvenv/                  # Virtual environment (ignored by git)
 ├── LICENSE                  # Project license
-└── README.md                # Docs
+└── README.md                # Documentation
 ```
 
 ## 🐛 Troubleshooting
@@ -186,47 +180,20 @@ assistive_vision/
 
 **1. Camera not accessible**
 - Ensure your browser has permission to access the webcam
-- Check if another application is using the camera
-- Try a different browser (Chrome/Firefox recommended)
+- HTTPS is required when accessing from external/remote devices
 
-**2. Module not found errors**
+**2. Port already in use**
 ```bash
-# Ensure virtual environment is activated
-source myenv/bin/activate  # Linux/macOS
-myenv\Scripts\activate     # Windows
+# Clear process using port 8080
+fuser -k 8080/tcp
+```
 
-# Reinstall dependencies
+**3. Module not found errors**
+```bash
+# Ensure virtual environment is activated and requirements installed
+source myvenv/bin/activate
 pip install -r backend/requirements.txt
 ```
-
-**3. Port already in use**
-```bash
-# Use a different port
-uvicorn main:app --reload --port 8081
-```
-
-**4. Slow performance**
-- Reduce `DETECT_INTERVAL` in main.py
-- Lower `JPEG_QUALITY` for faster transmission
-- Ensure CPU resources are available
-
-## 🚢 Deployment
-
-### Deploy Locally with Production Settings
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## 📄 License
 
@@ -234,18 +201,13 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 
 ## 👨‍💻 Author
 
-**PrasanthPradeep**(https://github.com/PrasanthPradeep/)
+**PrasanthPradeep** (https://github.com/PrasanthPradeep/)
 
 ## 🙏 Acknowledgments
 
-- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) for the object detection framework
+- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) for object detection
 - [FastAPI](https://fastapi.tiangolo.com/) for the web framework
 - [OpenCV](https://opencv.org/) for computer vision capabilities
-
-## 📞 Support
-
-If you encounter any issues or have questions:
-- Open an [Issue](https://github.com/PrasanthPradeep/Protego/issues)
 
 ---
 
