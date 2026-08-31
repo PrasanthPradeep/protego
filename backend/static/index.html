@@ -2,89 +2,526 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>🦺 Construction PPE Safety – Live Monitor</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Protego — Real-time PPE safety monitoring powered by YOLOv8 computer vision." />
+  <title>Protego · Safety Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
+    /* ── Tokens ─────────────────────────────────────── */
+    :root {
+      --bg:          #09090b;
+      --surface:     rgba(255,255,255,0.04);
+      --surface-hover: rgba(255,255,255,0.07);
+      --border:      rgba(255,255,255,0.07);
+      --border-hi:   rgba(255,255,255,0.12);
+      --text:        #fafafa;
+      --muted:       #71717a;
+      --green:       #22c55e;
+      --green-glow:  rgba(34,197,94,0.15);
+      --red:         #ef4444;
+      --red-dim:     rgba(239,68,68,0.12);
+      --amber:       #f59e0b;
+      --radius-sm:   8px;
+      --radius:      12px;
+      --radius-lg:   16px;
+      --ease:        cubic-bezier(0.16,1,0.3,1);
+    }
+
+    /* ── Reset ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+
     body {
-      margin: 0;
-      background: #0b0b0b;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-
-    h2 { margin: 12px; }
-
-    video, canvas {
-      width: 640px;
-      border: 2px solid #00ff6a;
-      margin-top: 10px;
-    }
-
-    #status {
-      margin-top: 6px;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
       font-size: 14px;
-      color: #00ff6a;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(9,9,11,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #conn-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: all 0.2s var(--ease);
+    }
+
+    #conn-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    #conn-pill.connected .dot   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    #conn-pill.connected        { border-color: rgba(34,197,94,0.25); color: var(--green); }
+    #conn-pill.error .dot       { background: var(--red); }
+    #conn-pill.error            { border-color: rgba(239,68,68,0.25); color: var(--red); }
+
+    #audio-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      transition: all 0.15s;
+    }
+    #audio-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-hi); }
+    #audio-btn.muted { opacity: 0.4; }
+
+    /* ── Main ───────────────────────────────────────── */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Feed Card ──────────────────────────────────── */
+    .feed-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      background: #0d0d10;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+      width: 100%;
+    }
+
+    #output {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .feed-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(9,9,11,0.85);
+      transition: opacity 0.4s;
+    }
+    .feed-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .feed-overlay p { color: var(--muted); font-size: 13px; }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .live-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: rgba(9,9,11,0.75);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+    .live-badge.active { color: var(--green); border-color: rgba(34,197,94,0.3); }
+    .live-badge.active .live-dot {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+
+    /* ── Stats Row ──────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .stat-card {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at top left, var(--card-glow, transparent) 0%, transparent 65%);
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .stat-card.violation {
+      border-color: rgba(239,68,68,0.35);
+      background: var(--red-dim);
+      --card-glow: rgba(239,68,68,0.1);
+      animation: shake 0.35s var(--ease);
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-3px); }
+      75%      { transform: translateX(3px); }
+    }
+
+    .stat-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .stat-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .stat-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid;
+      transition: all 0.25s;
+    }
+
+    .stat-badge.safe {
+      color: var(--green);
+      border-color: rgba(34,197,94,0.3);
+      background: rgba(34,197,94,0.08);
+    }
+
+    .stat-badge.violation {
+      color: var(--red);
+      border-color: rgba(239,68,68,0.4);
+      background: rgba(239,68,68,0.12);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .stat-count {
+      font-size: 22px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+
+    .stat-count.bad { color: var(--red); }
+
+    /* ── Log Panel ──────────────────────────────────── */
+    .log-card {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .log-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    #log-count {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
     }
 
     #log-panel {
-      width: 640px;
-      height: 180px;
-      margin: 12px auto;
-      padding: 10px;
-      border: 1px solid #444;
-      background: #111;
+      height: 200px;
       overflow-y: auto;
-      font-family: monospace;
-      color: #ff4c4c;
-      text-align: left;
+      padding: 4px 0;
     }
 
-    button {
-      margin: 6px;
-      padding: 6px 14px;
-      background: #222;
-      color: #fff;
-      border: 1px solid #555;
-      cursor: pointer;
+    #log-panel::-webkit-scrollbar { width: 4px; }
+    #log-panel::-webkit-scrollbar-track { background: transparent; }
+    #log-panel::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 99px; }
+
+    .log-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 16px;
+      transition: background 0.15s;
+      animation: fadeIn 0.2s var(--ease);
     }
 
-    button:hover { background: #333; }
+    .log-row:hover { background: var(--surface-hover); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .log-type {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 1px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .log-type.NO_HARDHAT      { background: rgba(239,68,68,0.12); color: #f87171; }
+    .log-type.NO_MASK         { background: rgba(245,158,11,0.12); color: #fbbf24; }
+    .log-type.NO_SAFETY_VEST  { background: rgba(239,68,68,0.12); color: #f87171; }
+
+    .log-severity {
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: auto;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Hidden canvas ──────────────────────────────── */
+    #canvas, #video { display: none; }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 640px) {
+      main { padding: 16px 12px 32px; gap: 14px; }
+      .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .stat-card { padding: 12px; }
+      .stat-count { font-size: 18px; }
+      nav { padding: 0 16px; }
+    }
+    @media (max-width: 420px) {
+      .stats-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
-
 <body>
 
-<h2>🦺 Construction PPE Safety – Live Monitor</h2>
+<!-- ── Nav ─────────────────────────────────────────────── -->
+<nav>
+  <a class="nav-brand" href="/">
+    <span class="brand-icon">🛡️</span>
+    Protego
+  </a>
+  <div class="nav-right">
+    <div id="conn-pill">
+      <span class="dot"></span>
+      <span id="conn-text">Connecting…</span>
+    </div>
+    <button id="audio-btn" title="Toggle audio alerts (M)" aria-label="Toggle audio">🔊</button>
+  </div>
+</nav>
 
+<!-- ── Main ─────────────────────────────────────────────── -->
+<main>
+
+  <!-- Live Feed -->
+  <div class="feed-card">
+    <canvas id="output" width="640" height="480"></canvas>
+
+    <div class="live-badge" id="live-badge">
+      <span class="live-dot"></span>
+      <span id="live-text">Initializing</span>
+    </div>
+
+    <div class="feed-overlay" id="overlay">
+      <div class="spinner"></div>
+      <p id="overlay-msg">Requesting camera access…</p>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="stats-row">
+    <div class="stat-card" id="card-hardhat">
+      <div class="stat-top">
+        <span class="stat-icon">⛑️</span>
+        <span class="stat-badge safe" id="badge-hardhat">Safe</span>
+      </div>
+      <div>
+        <div class="stat-label">Hard Hat</div>
+        <div class="stat-sub">Head protection</div>
+      </div>
+      <div class="stat-count" id="count-hardhat">0</div>
+    </div>
+    <div class="stat-card" id="card-mask">
+      <div class="stat-top">
+        <span class="stat-icon">😷</span>
+        <span class="stat-badge safe" id="badge-mask">Safe</span>
+      </div>
+      <div>
+        <div class="stat-label">Mask</div>
+        <div class="stat-sub">Respiratory protection</div>
+      </div>
+      <div class="stat-count" id="count-mask">0</div>
+    </div>
+    <div class="stat-card" id="card-vest">
+      <div class="stat-top">
+        <span class="stat-icon">🦺</span>
+        <span class="stat-badge safe" id="badge-vest">Safe</span>
+      </div>
+      <div>
+        <div class="stat-label">Safety Vest</div>
+        <div class="stat-sub">High-vis protection</div>
+      </div>
+      <div class="stat-count" id="count-vest">0</div>
+    </div>
+  </div>
+
+  <!-- Incident Log -->
+  <div class="log-card">
+    <div class="log-header">
+      <span class="log-title">Incident Log</span>
+      <span id="log-count">0 events</span>
+    </div>
+    <div id="log-panel"></div>
+  </div>
+
+</main>
+
+<!-- Hidden elements -->
 <video id="video" autoplay playsinline></video>
-<canvas id="canvas" width="640" height="480" hidden></canvas>
-<canvas id="output" width="640" height="480"></canvas>
-
-<div id="status">Initializing…</div>
-<div id="log-panel"></div>
-
-<button onclick="toggleAudio()">🔊 Toggle Audio</button>
+<canvas id="canvas" width="640" height="480"></canvas>
 
 <script>
-/* ================= AUDIO ENGINE ================= */
+/* ═══════════════════════════════════════════════
+   AUDIO ENGINE
+═══════════════════════════════════════════════ */
 let audioEnabled = true;
 let speaking = false;
 const queue = [];
 const lastSpoken = {};
-const COOLDOWN = 5000;
+const AUDIO_COOLDOWN = 5000;
 let voices = [];
 
-speechSynthesis.onvoiceschanged = () => {
-  voices = speechSynthesis.getVoices();
-};
+speechSynthesis.onvoiceschanged = () => { voices = speechSynthesis.getVoices(); };
 
 function enqueue(type, msg) {
   if (!audioEnabled) return;
-
   const now = Date.now();
-  if (lastSpoken[type] && now - lastSpoken[type] < COOLDOWN) return;
-
+  if (lastSpoken[type] && now - lastSpoken[type] < AUDIO_COOLDOWN) return;
   lastSpoken[type] = now;
   queue.push(msg);
   playNext();
@@ -92,81 +529,206 @@ function enqueue(type, msg) {
 
 function playNext() {
   if (speaking || queue.length === 0) return;
-
   speaking = true;
-  const text = queue.shift();
-  const u = new SpeechSynthesisUtterance(text);
-
-  const en = voices.find(v => v.lang.startsWith("en"));
+  const u = new SpeechSynthesisUtterance(queue.shift());
+  const en = voices.find(v => v.lang.startsWith('en'));
   if (en) u.voice = en;
-
   u.rate = 1.05;
-  u.onend = () => {
-    speaking = false;
-    playNext();
-  };
-
+  u.onend = () => { speaking = false; playNext(); };
   speechSynthesis.speak(u);
 }
 
-function toggleAudio() {
+const audioBtn = document.getElementById('audio-btn');
+audioBtn.addEventListener('click', () => {
   audioEnabled = !audioEnabled;
   speechSynthesis.cancel();
   queue.length = 0;
   speaking = false;
-}
+  audioBtn.textContent = audioEnabled ? '🔊' : '🔇';
+  audioBtn.classList.toggle('muted', !audioEnabled);
+});
 
-/* ================= VIDEO + WS ================= */
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const output = document.getElementById("output");
-const ctx = canvas.getContext("2d");
-const out = output.getContext("2d");
-const status = document.getElementById("status");
-const logPanel = document.getElementById("log-panel");
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) audioBtn.click();
+});
 
-const ws = new WebSocket(
-  (location.protocol === "https:" ? "wss://" : "ws://") +
-  location.host +
-  "/ws/safety"
-);
+/* ═══════════════════════════════════════════════
+   DOM REFS
+═══════════════════════════════════════════════ */
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('canvas');
+const output     = document.getElementById('output');
+const ctx        = canvas.getContext('2d');
+const out        = output.getContext('2d');
+const overlay    = document.getElementById('overlay');
+const overlayMsg = document.getElementById('overlay-msg');
+const liveBadge  = document.getElementById('live-badge');
+const liveText   = document.getElementById('live-text');
+const connPill   = document.getElementById('conn-pill');
+const connText   = document.getElementById('conn-text');
+const logPanel   = document.getElementById('log-panel');
+const logCount   = document.getElementById('log-count');
 
-ws.onopen = () => status.textContent = "✅ Connected";
-ws.onerror = () => status.textContent = "❌ WebSocket error";
+/* ═══════════════════════════════════════════════
+   STAT CARD HELPERS
+═══════════════════════════════════════════════ */
+const violationCounts = { NO_HARDHAT: 0, NO_MASK: 0, NO_SAFETY_VEST: 0 };
+const clearTimers     = { NO_HARDHAT: null, NO_MASK: null, NO_SAFETY_VEST: null };
 
-ws.onmessage = e => {
-  const d = JSON.parse(e.data);
-
-  logPanel.innerHTML = "";
-  d.logs?.slice().reverse().forEach(l => {
-    logPanel.innerHTML += `[${l.time}] ${l.type}<br>`;
-  });
-
-  d.violations?.forEach(v => {
-    if (v.type === "NO_HARDHAT") enqueue(v.type, "Warning. Hard hat missing.");
-    if (v.type === "NO_MASK") enqueue(v.type, "Warning. Safety mask missing.");
-    if (v.type === "NO_SAFETY_VEST") enqueue(v.type, "Warning. Safety vest missing.");
-  });
-
-  if (d.frame) {
-    const img = new Image();
-    img.onload = () => out.drawImage(img, 0, 0, 640, 480);
-    img.src = "data:image/jpeg;base64," + d.frame;
-  }
+const cardMap = {
+  NO_HARDHAT:     { card: 'card-hardhat', badge: 'badge-hardhat', count: 'count-hardhat' },
+  NO_MASK:        { card: 'card-mask',    badge: 'badge-mask',    count: 'count-mask'    },
+  NO_SAFETY_VEST: { card: 'card-vest',    badge: 'badge-vest',    count: 'count-vest'    },
 };
 
-/* ================= CAMERA ================= */
-navigator.mediaDevices.getUserMedia({ video: true })
+function triggerViolation(type) {
+  const m = cardMap[type];
+  if (!m) return;
+  violationCounts[type]++;
+  const card  = document.getElementById(m.card);
+  const badge = document.getElementById(m.badge);
+  const count = document.getElementById(m.count);
+  count.textContent = violationCounts[type];
+  count.classList.add('bad');
+  badge.textContent = 'Violation';
+  badge.className = 'stat-badge violation';
+  card.classList.remove('violation');
+  void card.offsetWidth; // reflow to re-trigger animation
+  card.classList.add('violation');
+  clearTimeout(clearTimers[type]);
+  clearTimers[type] = setTimeout(() => {
+    card.classList.remove('violation');
+    badge.textContent = 'Safe';
+    badge.className = 'stat-badge safe';
+  }, 3000);
+}
+
+/* ═══════════════════════════════════════════════
+   LOG RENDERER
+═══════════════════════════════════════════════ */
+const LABELS = {
+  NO_HARDHAT: 'No Hardhat',
+  NO_MASK: 'No Mask',
+  NO_SAFETY_VEST: 'No Safety Vest',
+};
+
+let totalEvents = 0;
+let lastLogLength = 0;
+
+function renderLogs(logs) {
+  if (!logs || logs.length === lastLogLength) return;
+  const newItems = logs.slice(lastLogLength);
+  lastLogLength = logs.length;
+  totalEvents += newItems.length;
+  logCount.textContent = `${totalEvents} event${totalEvents !== 1 ? 's' : ''}`;
+
+  const frag = document.createDocumentFragment();
+  newItems.forEach(l => {
+    const row = document.createElement('div');
+    row.className = 'log-row';
+
+    const time = document.createElement('span');
+    time.className = 'log-time';
+    time.textContent = l.time;
+
+    const tag = document.createElement('span');
+    tag.className = `log-type ${l.type}`;
+    tag.textContent = LABELS[l.type] || l.type;
+
+    const sev = document.createElement('span');
+    sev.className = 'log-severity';
+    sev.textContent = l.severity || 'HIGH';
+
+    row.appendChild(time);
+    row.appendChild(tag);
+    row.appendChild(sev);
+    frag.prepend(row); // newest first
+  });
+  logPanel.insertBefore(frag, logPanel.firstChild);
+}
+
+/* ═══════════════════════════════════════════════
+   WEBSOCKET  (auto-reconnect)
+═══════════════════════════════════════════════ */
+let ws, wsRetryDelay = 1000;
+
+function setConn(state, label) {
+  connPill.className = state;
+  connText.textContent = label;
+}
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  ws = new WebSocket(proto + location.host + '/ws/safety');
+
+  ws.onopen = () => {
+    setConn('connected', 'Live');
+    wsRetryDelay = 1000;
+  };
+
+  ws.onerror = () => setConn('error', 'Error');
+
+  ws.onclose = () => {
+    setConn('', 'Reconnecting…');
+    setTimeout(connectWS, wsRetryDelay);
+    wsRetryDelay = Math.min(wsRetryDelay * 2, 16000);
+  };
+
+  ws.onmessage = e => {
+    const d = JSON.parse(e.data);
+
+    // Violations
+    const activeTypes = new Set((d.violations || []).map(v => v.type));
+    activeTypes.forEach(type => {
+      triggerViolation(type);
+      if (type === 'NO_HARDHAT')     enqueue(type, 'Warning. Hard hat missing.');
+      if (type === 'NO_MASK')        enqueue(type, 'Warning. Safety mask missing.');
+      if (type === 'NO_SAFETY_VEST') enqueue(type, 'Warning. Safety vest missing.');
+    });
+
+    // Frame
+    if (d.frame) {
+      const img = new Image();
+      img.onload = () => {
+        out.drawImage(img, 0, 0, output.width, output.height);
+        overlay.classList.add('hidden');
+        liveBadge.classList.add('active');
+        liveText.textContent = 'Live';
+      };
+      img.src = 'data:image/jpeg;base64,' + d.frame;
+    }
+
+    renderLogs(d.logs);
+  };
+}
+
+connectWS();
+
+/* ═══════════════════════════════════════════════
+   CAMERA  (RAF-based frame dispatch)
+═══════════════════════════════════════════════ */
+const FRAME_INTERVAL = 200; // ms between frames
+let lastFrameTime = 0;
+
+function frameLoop(ts) {
+  if (ts - lastFrameTime >= FRAME_INTERVAL && ws && ws.readyState === WebSocket.OPEN) {
+    lastFrameTime = ts;
+    ctx.drawImage(video, 0, 0, 640, 480);
+    ws.send(canvas.toDataURL('image/jpeg', 0.7));
+  }
+  requestAnimationFrame(frameLoop);
+}
+
+navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
   .then(stream => {
     video.srcObject = stream;
-    status.textContent = "📷 Camera started";
-
-    setInterval(() => {
-      ctx.drawImage(video, 0, 0, 640, 480);
-      ws.send(canvas.toDataURL("image/jpeg", 0.7));
-    }, 200);
+    overlayMsg.textContent = 'Starting detection…';
+    video.onloadedmetadata = () => { requestAnimationFrame(frameLoop); };
   })
-  .catch(() => status.textContent = "❌ Camera access denied");
+  .catch(() => {
+    overlayMsg.textContent = 'Camera access denied. Please allow camera permissions.';
+    liveText.textContent = 'No Camera';
+  });
 </script>
 
 </body>
